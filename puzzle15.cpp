@@ -131,9 +131,6 @@ int h(State* state) {
     return distance;
 }
 
-
-
-
 struct StateAndScore {
     State* state;
     Dir dir;
@@ -290,6 +287,89 @@ void generateRandomState(State* state) {
     memcpy(state, &generatedState, sizeof(State));
 }
 
+
+
+int hV2(State* state, int n) {
+    // dont give penalty for missplaced pieces on the last row
+    if (n > GAME_SIZE * (GAME_SIZE - 1) - 1)
+        return h(state);
+    
+    int distance = 0;
+    // give penalty for missplaced already solved pieces
+    if (n != 0) {
+        for (size_t i = 0; i < n - 1; i++) {
+            if (state->nums[i] != i + 1)
+                distance += 1;
+        }
+    }
+
+    // try to give higher weight to placing the nth piece
+    // int currX = n % GAME_SIZE,
+    //     currY = n / GAME_SIZE;
+
+    // int destX, destY;
+    // if (state->nums[n] == GAME_SIZE * GAME_SIZE) {
+    //     destX = currX;
+    //     destY = currY;
+    // } else {
+    //     destX = (state->nums[n] - 1) % GAME_SIZE;
+    //     destY = (state->nums[n] - 1) / GAME_SIZE;
+    // }
+    // distance += 10 * (abs(destX - currX) + abs(destY - currY));
+
+    return distance + h(state);
+}
+
+int solvedCount(State* state) {
+    int count = 0;
+    for (size_t i = 0; i < GAME_SIZE * GAME_SIZE; i++) {
+        if (state->nums[i] != i + 1)
+            return count;
+        count++;
+    }
+
+    return count;
+}
+
+int searchV2(State* state, std::set<State>& searchedStates, List* list, int highestSolved) {
+    if (searchedStates.find(*state) != searchedStates.end())
+        return 0;
+
+    searchedStates.insert(*state);
+    if (isEndState(state))
+        return 1;
+
+    Dir dirs[4];
+    int n;
+    possibleDirs(state, dirs, &n);
+    int isFound = 0;
+    
+    std::vector<StateAndScore> stateAndScores;
+    for (size_t i = 0; i < n; i++) {
+        State* next = nextState(state, dirs[i]);
+        stateAndScores.push_back({next, dirs[i], hV2(next, highestSolved)});
+    }
+
+    std::sort(stateAndScores.begin(), stateAndScores.end());
+
+    for (size_t i = 0; i < n; i++) {
+        int solved = solvedCount(stateAndScores[i].state);
+        // TODO try without the max (maybe +1)
+        int res = searchV2(stateAndScores[i].state, searchedStates, list, std::max(solved, highestSolved));
+        if (res) {
+            Dir* dir = (Dir*)malloc(sizeof(Dir));
+            *dir = stateAndScores[i].dir;
+            appendNode(list, dir);
+            isFound = 1;
+            break;
+        } else {
+            free(stateAndScores[i].state);
+        }
+    }
+
+    return isFound;
+}
+
 int main() {
     srand (time (NULL));
 
@@ -310,15 +390,18 @@ int main() {
     // };
 
     State state;
-    // memcpy(&state, &random, sizeof(State));
-    memcpy(state.nums, startState, sizeof(startState));
-    state.emptyIndex = 3;
+    memcpy(&state, &random, sizeof(State));
+    // memcpy(state.nums, startState, sizeof(startState));
+    // state.emptyIndex = 3;
 
     std::set<State> searchedStates;
+    std::set<State> searchedStates2;
     List* list = createList();
+    List* list2 = createList();
     // NOTE improvment idea: search for moves that put 1 into the right
     // spot, then 2 (without misplacing 1) etc
     search(&state, searchedStates, list);
+    searchV2(&state, searchedStates2, list2, solvedCount(&state));
     reverseList(list);
 
 
@@ -326,34 +409,37 @@ int main() {
     printState(&state);
 
     printf("\nSolution (length=%d):\n", list->length);
-    State* currState = &state;
-    ListNode* iter = list->head;
-    for (size_t i = 0; i < list->length; i++) {
-        Dir* dir = (Dir*)iter->value;
+    printf("\nSolution2 (length=%d):\n", list2->length);
+
+
+    // State* currState = &state;
+    // ListNode* iter = list->head;
+    // for (size_t i = 0; i < list->length; i++) {
+    //     Dir* dir = (Dir*)iter->value;
         
-        State* temp = currState;
-        currState = nextState(currState, *dir);
-        // if (i != 0)
-        //     free(temp);
+    //     State* temp = currState;
+    //     currState = nextState(currState, *dir);
+    //     // if (i != 0)
+    //     //     free(temp);
 
-        // printDir(*dir);
-        // printf(" ");
-        // printf("\n");
-        // printState(currState);
-        // printf("\n");
+    //     // printDir(*dir);
+    //     // printf(" ");
+    //     // printf("\n");
+    //     // printState(currState);
+    //     // printf("\n");
 
-        iter = iter->next;
-    }
-    printf("\n");
+    //     iter = iter->next;
+    // }
+    // printf("\n");
 
-    if (currState != &state) {
-        free(currState);
-    }
+    // if (currState != &state) {
+    //     free(currState);
+    // }
 
-    iter = list->head;
-    for (size_t i = 0; i < list->length; i++) {
-        free(iter->value);
-        iter = iter->next;
-    }
-    deleteList(list);
+    // iter = list->head;
+    // for (size_t i = 0; i < list->length; i++) {
+    //     free(iter->value);
+    //     iter = iter->next;
+    // }
+    // deleteList(list);
 }
