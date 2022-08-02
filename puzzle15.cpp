@@ -1,26 +1,78 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 #include <string.h>
 
 #include <set>
 #include <vector>
 #include <algorithm>
 
-#include "list.h"
+#include "puzzle15.h"
 
-#define GAME_SIZE 4
+void reverseList(ListNode* iter, ListNode* prev) {
+    if (iter->next != NULL)
+        reverseList(iter->next, iter);
+    iter->next = prev;
 
-struct State {
-    int nums[GAME_SIZE * GAME_SIZE];
-    int emptyIndex;
-};
+    if (iter == prev)
+        iter->next = NULL;
+}
 
-typedef enum {
-    RIGHT, LEFT, UP, DOWN
-} Dir;
+void reverseList(List* list) {
+    reverseList(list->head, list->head);
+    ListNode* temp = list->head;
+    list->head = list->tail;
+    list->tail = temp;
+}
 
+void generateRandomState(State* state) {
+    int randomMoveCount = 300;
 
+    // starting state
+    State generatedState;
+    for (size_t i = 0; i < GAME_SIZE * GAME_SIZE; i++)
+        generatedState.nums[i] = i + 1;
+    generatedState.emptyIndex = GAME_SIZE * GAME_SIZE - 1;
+    
+    for (size_t i = 0; i < randomMoveCount; i++) {
+        int n;
+        Dir possibleMoves[4];
+        possibleDirs(&generatedState, possibleMoves, &n);
+
+        Dir move = possibleMoves[(rand() % n)];
+        State* nState = nextState(&generatedState, move);
+        memcpy(&generatedState, nState, sizeof(State));
+        free(nState);
+    }
+    
+    memcpy(state, &generatedState, sizeof(State));
+}
+
+int solvedCount(State* state) {
+    int count = 0;
+    for (size_t i = 0; i < GAME_SIZE * GAME_SIZE; i++) {
+        if (state->nums[i] != i + 1)
+            return count;
+        count++;
+    }
+
+    return count;
+}
+
+int operator<(const State& s1, const State& s2) {
+    for (size_t i = 0; i < GAME_SIZE * GAME_SIZE; i++) {
+        if (s1.nums[i] < s2.nums[i]) {
+            return 1;
+        }
+        else if (s1.nums[i] > s2.nums[i]) {
+            return 0;
+        }
+    }
+    return 0;
+}
+
+int operator<(const StateAndScore& s1, const StateAndScore& s2) {
+    return s1.score < s2.score;
+}
 
 State* nextState(State* state, Dir dir) {
     State* next = (State*)malloc(sizeof(State));
@@ -94,6 +146,24 @@ void printDir(Dir dir) {
         printf("DOWN");
 }
 
+void printAllStates(std::set<State>& states) {
+    printf("printing states\n");
+    for (auto &&state : states) {
+        printf("%d\n", state.emptyIndex);
+    }
+    printf("\n");
+}
+
+void printList(List* list) {
+    ListNode* iter = list->head;
+
+    while (iter) {
+        printf("%d ", (long long)iter->value);
+        iter = iter->next;
+    }
+    printf("\n");
+}
+
 int h(State* state) {
     int distance = 0;
     for (size_t i = 0; i < GAME_SIZE * GAME_SIZE; i++) {
@@ -131,38 +201,38 @@ int h(State* state) {
     return distance;
 }
 
-struct StateAndScore {
-    State* state;
-    Dir dir;
-    int score;    
-};
-
-void printAllStates(std::set<State>& states) {
-    printf("printing states\n");
-    for (auto &&state : states) {
-        printf("%d\n", state.emptyIndex);
-    }
-    printf("\n");
-}
-
-int operator<(const State& s1, const State& s2) {
-    for (size_t i = 0; i < GAME_SIZE * GAME_SIZE; i++) {
-        if (s1.nums[i] < s2.nums[i]) {
-            return 1;
-        }
-        else if (s1.nums[i] > s2.nums[i]) {
-            return 0;
+int hV2(State* state, int n) {
+    // dont give penalty for missplaced pieces on the last row
+    if (n > GAME_SIZE * (GAME_SIZE - 1) - 1)
+        return h(state);
+    
+    int distance = 0;
+    // give penalty for missplaced already solved pieces
+    if (n != 0) {
+        for (size_t i = 0; i < n - 1; i++) {
+            if (state->nums[i] != i + 1)
+                distance += 1;
         }
     }
-    return 0;
+
+    // try to give higher weight to placing the nth piece
+    // int currX = n % GAME_SIZE,
+    //     currY = n / GAME_SIZE;
+
+    // int destX, destY;
+    // if (state->nums[n] == GAME_SIZE * GAME_SIZE) {
+    //     destX = currX;
+    //     destY = currY;
+    // } else {
+    //     destX = (state->nums[n] - 1) % GAME_SIZE;
+    //     destY = (state->nums[n] - 1) / GAME_SIZE;
+    // }
+    // distance += 10 * (abs(destX - currX) + abs(destY - currY));
+
+    return distance + h(state);
 }
 
-
-int operator<(const StateAndScore& s1, const StateAndScore& s2) {
-    return s1.score < s2.score;
-}
-
-int search(State* state, std::set<State>& searchedStates, List* list, int depthLimit = -1, int depth = 0) {
+int search(State* state, std::set<State>& searchedStates, List* list, int depthLimit, int depth) {
     if (depthLimit != -1 && depth > depthLimit)
         return 0;
 
@@ -215,8 +285,7 @@ int search(State* state, std::set<State>& searchedStates, List* list, int depthL
     }
 }
 
-
-int iterativeDeepeningSearch(State* state, int depthLimit = 200) {
+int iterativeDeepeningSearch(State* state, int depthLimit) {
     for (size_t i = 0; i < depthLimit; i++) {
         std::set<State> searchedStates;
         List* list = createList();
@@ -224,8 +293,10 @@ int iterativeDeepeningSearch(State* state, int depthLimit = 200) {
 
         if (res) {
             printf("found %d!\n", list->length);
+            reverseList(list);
             ListNode* iter = list->head;
             for (size_t i = 0; i < list->length; i++) {
+
                 free(iter->value);
                 iter = iter->next;
             }
@@ -236,99 +307,6 @@ int iterativeDeepeningSearch(State* state, int depthLimit = 200) {
         deleteList(list);
     }
     return 0;
-}
-
-void reverseList(ListNode* iter, ListNode* prev) {
-    if (iter->next != NULL)
-        reverseList(iter->next, iter);
-    iter->next = prev;
-
-    if (iter == prev)
-        iter->next = NULL;
-}
-
-void reverseList(List* list) {
-    reverseList(list->head, list->head);
-    ListNode* temp = list->head;
-    list->head = list->tail;
-    list->tail = temp;
-}
-
-void printList(List* list) {
-    ListNode* iter = list->head;
-
-    while (iter) {
-        printf("%d ", (long long)iter->value);
-        iter = iter->next;
-    }
-    printf("\n");
-}
-
-void generateRandomState(State* state) {
-    int randomMoveCount = 300;
-
-    // starting state
-    State generatedState;
-    for (size_t i = 0; i < GAME_SIZE * GAME_SIZE; i++)
-        generatedState.nums[i] = i + 1;
-    generatedState.emptyIndex = 15;
-    
-    for (size_t i = 0; i < randomMoveCount; i++) {
-        int n;
-        Dir possibleMoves[4];
-        possibleDirs(&generatedState, possibleMoves, &n);
-
-        Dir move = possibleMoves[(rand() % n)];
-        State* nState = nextState(&generatedState, move);
-        memcpy(&generatedState, nState, sizeof(State));
-        free(nState);
-    }
-    
-    memcpy(state, &generatedState, sizeof(State));
-}
-
-
-
-int hV2(State* state, int n) {
-    // dont give penalty for missplaced pieces on the last row
-    if (n > GAME_SIZE * (GAME_SIZE - 1) - 1)
-        return h(state);
-    
-    int distance = 0;
-    // give penalty for missplaced already solved pieces
-    if (n != 0) {
-        for (size_t i = 0; i < n - 1; i++) {
-            if (state->nums[i] != i + 1)
-                distance += 1;
-        }
-    }
-
-    // try to give higher weight to placing the nth piece
-    // int currX = n % GAME_SIZE,
-    //     currY = n / GAME_SIZE;
-
-    // int destX, destY;
-    // if (state->nums[n] == GAME_SIZE * GAME_SIZE) {
-    //     destX = currX;
-    //     destY = currY;
-    // } else {
-    //     destX = (state->nums[n] - 1) % GAME_SIZE;
-    //     destY = (state->nums[n] - 1) / GAME_SIZE;
-    // }
-    // distance += 10 * (abs(destX - currX) + abs(destY - currY));
-
-    return distance + h(state);
-}
-
-int solvedCount(State* state) {
-    int count = 0;
-    for (size_t i = 0; i < GAME_SIZE * GAME_SIZE; i++) {
-        if (state->nums[i] != i + 1)
-            return count;
-        count++;
-    }
-
-    return count;
 }
 
 int searchV2(State* state, std::set<State>& searchedStates, List* list, int highestSolved) {
@@ -368,78 +346,4 @@ int searchV2(State* state, std::set<State>& searchedStates, List* list, int high
     }
 
     return isFound;
-}
-
-int main() {
-    srand (time (NULL));
-
-    State random;
-    generateRandomState(&random);
-
-    int startState[GAME_SIZE * GAME_SIZE] = {
-        2, 15, 9, 16,
-        8, 7, 1, 6,
-        4, 11, 12, 3,
-        5, 10, 14, 13
-    };
-
-    // int startState[GAME_SIZE * GAME_SIZE] = {
-    //     1,8,9,
-    //     4,3,2,
-    //     5,7,6
-    // };
-
-    State state;
-    memcpy(&state, &random, sizeof(State));
-    // memcpy(state.nums, startState, sizeof(startState));
-    // state.emptyIndex = 3;
-
-    std::set<State> searchedStates;
-    std::set<State> searchedStates2;
-    List* list = createList();
-    List* list2 = createList();
-    // NOTE improvment idea: search for moves that put 1 into the right
-    // spot, then 2 (without misplacing 1) etc
-    search(&state, searchedStates, list);
-    searchV2(&state, searchedStates2, list2, solvedCount(&state));
-    reverseList(list);
-
-
-    printf("Starting state:\n");
-    printState(&state);
-
-    printf("\nSolution (length=%d):\n", list->length);
-    printf("\nSolution2 (length=%d):\n", list2->length);
-
-
-    // State* currState = &state;
-    // ListNode* iter = list->head;
-    // for (size_t i = 0; i < list->length; i++) {
-    //     Dir* dir = (Dir*)iter->value;
-        
-    //     State* temp = currState;
-    //     currState = nextState(currState, *dir);
-    //     // if (i != 0)
-    //     //     free(temp);
-
-    //     // printDir(*dir);
-    //     // printf(" ");
-    //     // printf("\n");
-    //     // printState(currState);
-    //     // printf("\n");
-
-    //     iter = iter->next;
-    // }
-    // printf("\n");
-
-    // if (currState != &state) {
-    //     free(currState);
-    // }
-
-    // iter = list->head;
-    // for (size_t i = 0; i < list->length; i++) {
-    //     free(iter->value);
-    //     iter = iter->next;
-    // }
-    // deleteList(list);
 }
