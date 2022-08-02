@@ -3,7 +3,6 @@
 
 #define GAME_SIZE 3
 
-#include "list.h"
 #include <set>
 
 struct State {
@@ -22,8 +21,6 @@ struct StateAndScore {
 };
 
 // -- utility functions --
-void reverseList(ListNode* iter, ListNode* prev);
-void reverseList(List* list);
 
 void generateRandomState(State* state);
 int solvedCount(State* state);
@@ -39,15 +36,14 @@ int operator<(const StateAndScore& s1, const StateAndScore& s2);
 void printState(const State* state);
 void printDir(Dir dir);
 void printAllStates(std::set<State>& states);
-void printList(List* list);
 
 // hueristic functions
 int h(State* state);
 int hV2(State* state, int n);
 
 // search methods
-int search(State* state, std::set<State>& searchedStates, List* list, int depthLimit = -1, int depth = 0);
+int search(State* state, std::set<State>& searchedStates, std::vector<Dir>& solution, int depthLimit = -1, int depth = 0);
 int iterativeDeepeningSearch(State* state, int depthLimit = 200);
-int searchV2(State* state, std::set<State>& searchedStates, List* list, int highestSolved);
+int searchV2(State* state, std::set<State>& searchedStates, std::vector<Dir>& solution, int highestSolved);
 
 #endif

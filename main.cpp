@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <time.h>
 #include <string.h>
 
@@ -7,7 +6,6 @@
 #include <vector>
 #include <algorithm>
 
-#include "list.h"
 #include "puzzle15.h"
 
 int main() {
@@ -36,20 +34,21 @@ int main() {
 
     std::set<State> searchedStates;
     std::set<State> searchedStates2;
-    List* list = createList();
-    List* list2 = createList();
+
+    std::vector<Dir> solution;
+    std::vector<Dir> solution2;
     // NOTE improvment idea: search for moves that put 1 into the right
     // spot, then 2 (without misplacing 1) etc
-    search(&state, searchedStates, list);
-    searchV2(&state, searchedStates2, list2, solvedCount(&state));
-    reverseList(list);
-
+    search(&state, searchedStates, solution);
+    searchV2(&state, searchedStates2, solution2, solvedCount(&state));
+    std::reverse(solution.begin(), solution.end());
+    std::reverse(solution2.begin(), solution2.end());
 
     printf("Starting state:\n");
     printState(&state);
 
-    printf("\nSolution (length=%d):\n", list->length);
-    printf("\nSolution2 (length=%d):\n", list2->length);
+    printf("\nSolution (length=%d):\n", solution.size());
+    printf("\nSolution2 (length=%d):\n", solution2.size());
 
     iterativeDeepeningSearch(&state);
     // State* currState = &state;
@@ -76,10 +75,5 @@ int main() {
     //     free(currState);
     // }
 
-    // iter = list->head;
-    // for (size_t i = 0; i < list->length; i++) {
-    //     free(iter->value);
-    //     iter = iter->next;
-    // }
     // deleteList(list);
 }

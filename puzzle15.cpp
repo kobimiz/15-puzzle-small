@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include <set>
@@ -8,21 +7,6 @@
 
 #include "puzzle15.h"
 
-void reverseList(ListNode* iter, ListNode* prev) {
-    if (iter->next != NULL)
-        reverseList(iter->next, iter);
-    iter->next = prev;
-
-    if (iter == prev)
-        iter->next = NULL;
-}
-
-void reverseList(List* list) {
-    reverseList(list->head, list->head);
-    ListNode* temp = list->head;
-    list->head = list->tail;
-    list->tail = temp;
-}
 
 void generateRandomState(State* state) {
     int randomMoveCount = 300;
@@ -75,7 +59,7 @@ int operator<(const StateAndScore& s1, const StateAndScore& s2) {
 }
 
 State* nextState(State* state, Dir dir) {
-    State* next = (State*)malloc(sizeof(State));
+    State* next = new State;
     memcpy(next, state, sizeof(State));
     int prevEmptyIndex = next->emptyIndex;
     if (dir == RIGHT)
@@ -154,16 +138,6 @@ void printAllStates(std::set<State>& states) {
     printf("\n");
 }
 
-void printList(List* list) {
-    ListNode* iter = list->head;
-
-    while (iter) {
-        printf("%d ", (long long)iter->value);
-        iter = iter->next;
-    }
-    printf("\n");
-}
-
 int h(State* state) {
     int distance = 0;
     for (size_t i = 0; i < GAME_SIZE * GAME_SIZE; i++) {
@@ -232,13 +206,13 @@ int hV2(State* state, int n) {
     return distance + h(state);
 }
 
-int search(State* state, std::set<State>& searchedStates, List* list, int depthLimit, int depth) {
+int search(State* state, std::set<State>& searchedStates,  std::vector<Dir>& solution, int depthLimit, int depth) {
     if (depthLimit != -1 && depth > depthLimit)
         return 0;
 
-    if (searchedStates.find(*state) != searchedStates.end()) {
+    if (searchedStates.find(*state) != searchedStates.end())
         return 0;
-    } else {
+    else {
         if (searchedStates.size() % 100000 == 0) {
             // printf("h=%d size=%d emptyindex=%d sizeBytes=%d\n",
             //     h(state),
@@ -255,9 +229,6 @@ int search(State* state, std::set<State>& searchedStates, List* list, int depthL
         Dir dirs[4];
         int n;
         possibleDirs(state, dirs, &n);
-        if (n == 0)
-            return 0;
-
         int isFound = 0;
         
         std::vector<StateAndScore> stateAndScores;
@@ -269,11 +240,9 @@ int search(State* state, std::set<State>& searchedStates, List* list, int depthL
         std::sort(stateAndScores.begin(), stateAndScores.end());
 
         for (size_t i = 0; i < n; i++) {
-            int res = search(stateAndScores[i].state, searchedStates, list, depthLimit, depth + 1);
+            int res = search(stateAndScores[i].state, searchedStates, solution, depthLimit, depth + 1);
             if (res) {
-                Dir* dir = (Dir*)malloc(sizeof(Dir));
-                *dir = stateAndScores[i].dir;
-                appendNode(list, dir);
+                solution.push_back(stateAndScores[i].dir);
                 isFound = 1;
                 break;
             } else {
@@ -288,28 +257,25 @@ int search(State* state, std::set<State>& searchedStates, List* list, int depthL
 int iterativeDeepeningSearch(State* state, int depthLimit) {
     for (size_t i = 0; i < depthLimit; i++) {
         std::set<State> searchedStates;
-        List* list = createList();
-        int res = search(state, searchedStates, list, i);
+        std::vector<Dir> solution;
+        int res = search(state, searchedStates, solution, i);
 
         if (res) {
-            printf("found %d!\n", list->length);
-            reverseList(list);
-            ListNode* iter = list->head;
-            for (size_t i = 0; i < list->length; i++) {
-
-                free(iter->value);
-                iter = iter->next;
+            printf("found %d!\n", solution.size());
+            // NOTE i dont have to reverse, can traverse backwards
+            std::reverse(solution.begin(), solution.end());
+            for (auto &&dir : solution) {
+                
             }
+            
             return 1;
-        } else {
+        } else
             printf("depth %d not found\n", i);
-        }
-        deleteList(list);
     }
     return 0;
 }
 
-int searchV2(State* state, std::set<State>& searchedStates, List* list, int highestSolved) {
+int searchV2(State* state, std::set<State>& searchedStates,  std::vector<Dir>& solution, int highestSolved) {
     if (searchedStates.find(*state) != searchedStates.end())
         return 0;
 
@@ -333,11 +299,9 @@ int searchV2(State* state, std::set<State>& searchedStates, List* list, int high
     for (size_t i = 0; i < n; i++) {
         int solved = solvedCount(stateAndScores[i].state);
         // TODO try without the max (maybe +1)
-        int res = searchV2(stateAndScores[i].state, searchedStates, list, std::max(solved, highestSolved));
+        int res = searchV2(stateAndScores[i].state, searchedStates, solution, std::max(solved, highestSolved));
         if (res) {
-            Dir* dir = (Dir*)malloc(sizeof(Dir));
-            *dir = stateAndScores[i].dir;
-            appendNode(list, dir);
+            solution.push_back(stateAndScores[i].dir);
             isFound = 1;
             break;
         } else {
